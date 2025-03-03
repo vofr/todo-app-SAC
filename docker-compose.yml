@@ -1,38 +1,52 @@
 version: "3.8"
+
 services:
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - network-backend
+
   web:
     build: ./frontend
     depends_on:
       - api
-    ports:
-      - "3000:3000"
     networks:
       - network-backend
+    environment:
+      REACT_APP_API_URL: http://34.172.78.49:80/api
+    labels:
+      - "traefik.http.routers.web.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.web.priority=1"
+      - "traefik.http.middlewares.web-strip-prefix.stripprefix.prefixes=/api"
+      - "traefik.http.routers.web.middlewares=web-strip-prefix"
+
   api:
     build: ./backend
     depends_on:
       - mongo
-    ports:
-      - "3001:3001"
     networks: 
-     - network-backend
-  
+      - network-backend
+    labels:
+      - "traefik.http.routers.api.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.api.priority=2"
+
   mongo:
     image: mongo
     restart: always
-    volumes: 
-      - mongodb_data:/data/db
     environment: 
-      MONGODB_INITDB_ROOT_USERNAME: username
-      MONGODB_INITDB_ROOT_PASSWORD: password
-    # uncomment following lines to access db locally
-    # ports:
-    #   - 27017:27017
+      MONGO_INITDB_ROOT_USERNAME: username
+      MONGO_INITDB_ROOT_PASSWORD: password
     networks: 
-     - network-backend
+      - network-backend
 
 networks:
   network-backend:
-
-volumes: 
-  mongodb_data:
